@@ -8,6 +8,8 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import db from './db/drizzle'
 import { users } from './db/schema'
 
+export const runtime = 'nodejs'
+
 export const config = {
   pages: {
     signIn: '/sign-in',
@@ -17,7 +19,13 @@ export const config = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60,
   },
+
+  // ✅ Vercel에서 MissingSecret 나는 거 방지
+  secret: process.env.AUTH_SECRET,
+  trustHost: true,
+
   adapter: DrizzleAdapter(db),
+
   providers: [
     CredentialsProvider({
       credentials: {
@@ -47,29 +55,29 @@ export const config = {
           where: eq(users.email, email),
         })) as any
 
-        console.log('📝 authorize - dbUser:', dbUser)
+        console.log('authorize - dbUser:', dbUser)
 
         if (!dbUser) {
-          console.log('❌ authorize: 해당 email 유저 없음')
+          console.log('authorize: 해당 email 유저 없음')
           return null
         }
 
         if (!dbUser.password) {
-          console.log('❌ authorize: dbUser.password 없음')
+          console.log('authorize: dbUser.password 없음')
           return null
         }
 
         // 3) 비번 비교
         const isMatch = compareSync(password, dbUser.password as string)
-        console.log('📝 authorize - isMatch:', isMatch)
+        console.log('authorize - isMatch:', isMatch)
 
         if (!isMatch) {
-          console.log('❌ authorize: 비밀번호 불일치')
+          console.log('authorize: 비밀번호 불일치')
           return null
         }
 
         // 4) 성공
-        console.log('✅ authorize: 로그인 성공, user 반환')
+        console.log('authorize: 로그인 성공, user 반환')
 
         return {
           id: dbUser.id,
@@ -80,6 +88,7 @@ export const config = {
       },
     }),
   ],
+
   callbacks: {
     session: async ({ session, user, trigger, token }: any) => {
       session.user.id = token.sub
@@ -90,4 +99,5 @@ export const config = {
     },
   },
 } satisfies NextAuthConfig
+
 export const { handlers, auth, signIn, signOut } = NextAuth(config)
