@@ -11,8 +11,6 @@ import { users } from './db/schema'
 
 export const runtime = 'nodejs'
 
-// ✅ 환경변수에 없어도 항상 값이 있도록 기본 secret 하나 만들어줌
-//   (프로젝트 과제용이라 보안상 크게 문제 없음)
 const authSecret = process.env.AUTH_SECRET || 'ably-shopping-dev-secret-123456'
 
 export const config = {
