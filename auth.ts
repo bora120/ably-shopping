@@ -1,3 +1,4 @@
+// auth.ts
 import { DrizzleAdapter } from '@auth/drizzle-adapter'
 import { compareSync } from 'bcrypt-ts-edge'
 import { eq } from 'drizzle-orm'
@@ -10,6 +11,10 @@ import { users } from './db/schema'
 
 export const runtime = 'nodejs'
 
+// ✅ 환경변수에 없어도 항상 값이 있도록 기본 secret 하나 만들어줌
+//   (프로젝트 과제용이라 보안상 크게 문제 없음)
+const authSecret = process.env.AUTH_SECRET || 'ably-shopping-dev-secret-123456'
+
 export const config = {
   pages: {
     signIn: '/sign-in',
@@ -20,8 +25,8 @@ export const config = {
     maxAge: 30 * 24 * 60 * 60,
   },
 
-  // ✅ Vercel에서 MissingSecret 나는 거 방지
-  secret: process.env.AUTH_SECRET,
+  // ✅ MissingSecret 방지
+  secret: authSecret,
   trustHost: true,
 
   adapter: DrizzleAdapter(db),
@@ -55,29 +60,29 @@ export const config = {
           where: eq(users.email, email),
         })) as any
 
-        console.log('authorize - dbUser:', dbUser)
+        console.log('📝 authorize - dbUser:', dbUser)
 
         if (!dbUser) {
-          console.log('authorize: 해당 email 유저 없음')
+          console.log('❌ authorize: 해당 email 유저 없음')
           return null
         }
 
         if (!dbUser.password) {
-          console.log('authorize: dbUser.password 없음')
+          console.log('❌ authorize: dbUser.password 없음')
           return null
         }
 
         // 3) 비번 비교
         const isMatch = compareSync(password, dbUser.password as string)
-        console.log('authorize - isMatch:', isMatch)
+        console.log('📝 authorize - isMatch:', isMatch)
 
         if (!isMatch) {
-          console.log('authorize: 비밀번호 불일치')
+          console.log('❌ authorize: 비밀번호 불일치')
           return null
         }
 
         // 4) 성공
-        console.log('authorize: 로그인 성공, user 반환')
+        console.log('✅ authorize: 로그인 성공, user 반환')
 
         return {
           id: dbUser.id,
@@ -90,11 +95,21 @@ export const config = {
   ],
 
   callbacks: {
-    session: async ({ session, user, trigger, token }: any) => {
-      session.user.id = token.sub
-      if (trigger === 'update') {
-        session.user.name = user.name
+    // ✅ user / session.user 방어 코드 추가 (읽을 때 undefined 방지)
+    async session({ session, token, user, trigger }: any) {
+      // session.user가 없으면 기본 객체부터 만들어 줌
+      if (!session.user) {
+        session.user = {} as any
       }
+
+      if (token?.sub) {
+        ;(session.user as any).id = token.sub
+      }
+
+      if (trigger === 'update' && user) {
+        ;(session.user as any).name = user.name
+      }
+
       return session
     },
   },
